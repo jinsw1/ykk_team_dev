@@ -1,0 +1,64 @@
+{
+    "InstanceInformationList": [
+        {
+            "InstanceId": "i-016a152acba684cfd",
+            "PingStatus": "Online",
+            "LastPingDateTime": "2026-06-16T15:13:06.675000+09:00",
+            "AgentVersion": "3.3.4121.0",
+            "IsLatestVersion": false,
+            "PlatformType": "Linux",
+            "PlatformName": "Ubuntu",
+            "PlatformVersion": "24.04",
+            "ResourceType": "EC2Instance",
+            "IPAddress": "10.0.30.23",
+            "ComputerName": "ip-10-0-30-23.ap-northeast-2.compute.internal",
+            "SourceId": "i-016a152acba684cfd",
+            "SourceType": "AWS::EC2::Instance"
+        },
+        {
+            "InstanceId": "i-027b56a8b6002fa30",
+            "PingStatus": "Online",
+            "LastPingDateTime": "2026-06-16T15:14:50.052000+09:00",
+            "AgentVersion": "3.3.4121.0",
+            "IsLatestVersion": false,
+            "PlatformType": "Linux",
+            "PlatformName": "Ubuntu",
+            "PlatformVersion": "24.04",
+            "ResourceType": "EC2Instance",
+            "IPAddress": "10.0.21.35",
+            "ComputerName": "ip-10-0-21-35.ap-northeast-2.compute.internal",
+            "SourceId": "i-027b56a8b6002fa30",
+            "SourceType": "AWS::EC2::Instance"
+        },
+        {
+            "InstanceId": "i-0b26935ff0c8ff4ac",
+            "PingStatus": "Online",
+            "LastPingDateTime": "2026-06-16T15:14:41.139000+09:00",
+            "AgentVersion": "3.3.4121.0",
+            "IsLatestVersion": false,
+            "PlatformType": "Linux",
+            "PlatformName": "Ubuntu",
+            "PlatformVersion": "24.04",
+            "ResourceType": "EC2Instance",
+            "IPAddress": "10.0.10.15",
+            "ComputerName": "ip-10-0-10-15.ap-northeast-2.compute.internal",
+            "SourceId": "i-0b26935ff0c8ff4ac",
+            "SourceType": "AWS::EC2::Instance"
+        },
+        {
+            "InstanceId": "i-01309b26767937931",
+            "PingStatus": "Online",
+            "LastPingDateTime": "2026-06-16T15:13:37.049000+09:00",
+            "AgentVersion": "3.3.4121.0",
+            "IsLatestVersion": false,
+            "PlatformType": "Linux",
+            "PlatformName": "Ubuntu",
+            "PlatformVersion": "24.04",
+            "ResourceType": "EC2Instance",
+            "IPAddress": "10.0.20.74",
+            "ComputerName": "ip-10-0-20-74.ap-northeast-2.compute.internal",
+            "SourceId": "i-01309b26767937931",
+            "SourceType": "AWS::EC2::Instance"
+        }
+    ]
+}

@@ -3,12 +3,13 @@ name: CI/CD Docker
 on:
   push:
     branches: [ "main" ]
-    paths:
-      - "Dockerfile"
-      - "docker-compose.yml"
-      - "src/**"
-      - "app/**"   
-
+    # paths:
+    #   - "Dockerfile"
+    #   - "docker-compose.yml"
+    #   - "src/**"
+    #   - "app/**"   
+  workflow_dispatch:
+  
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -41,14 +42,20 @@ jobs:
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=project02-was*" \
-            --parameters 'commands=[
-              "docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }}",
+            --targets "Key=tag:Name,Values=project02-was01" \
+            --parameters 'commands=[              
               "cd /home/ubuntu/app",
               "docker compose up -d"
             ]'
 
-
+      # aws ssm send-command \
+      #   --document-name "AWS-RunShellScript" \
+      #   --targets "Key=tag:Name,Values=project02-was01" \
+      #   --parameters 'commands=[
+      #     "docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }}",
+      #     "cd /home/ubuntu/app",
+      #     "docker compose up -d"
+      #   ]'
 
 
       # - name: Get EC2 ID by Name

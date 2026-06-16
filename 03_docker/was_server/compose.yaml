@@ -8,6 +8,14 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/dev/conf.d:/etc/nginx/conf.d:ro
+      # 로그 저장
+      - ./logs:/var/log/nginx
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"      
     # depends_on:
     #   - fastapi
     networks:

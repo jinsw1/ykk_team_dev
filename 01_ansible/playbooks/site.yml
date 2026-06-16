@@ -34,3 +34,10 @@
   roles:
     - role: was_set
       tags: [common, security]
+
+
+- name: ""
+  hosts: ykk_db
+  roles:
+    - role: db_set
+      tags: [common, security]

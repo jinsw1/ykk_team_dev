@@ -28,7 +28,7 @@ jobs:
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Role,Values=was" \
+            --targets "Key=tag:SSMRole,Values=was" \            
             --comment "Sparse checkout deploy" \
             --parameters 'commands=[
               "set -e",
@@ -52,6 +52,7 @@ jobs:
 
       # aws ssm send-command \
       #   --document-name "AWS-RunShellScript" \
+      #   --targets "Key=tag:Role,Values=was" \
       #   --targets "Key=tag:Name,Values=project02-was01" \
       #   --targets "Key=tag:Name,Values=project02-was*" \
       #   --targets "Key=tag:Name,Values=project02-was01,project02-was02" \

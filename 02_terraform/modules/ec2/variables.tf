@@ -18,6 +18,14 @@ variable "name" {
   type = string
 }
 
+variable "role" {
+  type = string
+}
+
+variable "env" {
+  type = string
+}
+
 variable "root_volume_size" {
   type    = number
   default = 10

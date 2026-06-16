@@ -67,3 +67,6 @@
     name: "{{ ansible_user }}" # 앤서블이 SSH로 접속할 때 사용한 계정 (예: ubuntu)
     groups: docker
     append: yes # 기존 그룹을 유지하면서 docker 그룹만 추가
+
+- name: Reconnect to apply group change
+  meta: reset_connection

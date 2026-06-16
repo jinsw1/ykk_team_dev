@@ -10,12 +10,6 @@
     - role: common
       tags: [common, security]
 
-- name: ""
-  hosts: ykk_was  
-  roles:
-    - role: was_set
-      tags: [common, security]
-
 # # =================================================================
 # # [2단계] 모든 서버 컨테이너 구동 환경 (Docker) 구축
 # # =================================================================
@@ -31,4 +25,12 @@
   become: yes
   roles:
     - role: docker
+      tags: [common, security]
+
+
+
+- name: ""
+  hosts: ykk_was  
+  roles:
+    - role: was_set
       tags: [common, security]

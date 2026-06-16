@@ -45,10 +45,12 @@ resource "aws_instance" "this" {
     volume_type = "gp3"
   }
 
-  tags = merge(
-    {
-      Name = var.name
-    },
-    var.tags
-  )
+  tags = {
+    Name     = var.name
+    Role     = var.role
+    Env      = var.env
+
+    # ⭐ SSM 전용 타겟 태그
+    SSMRole  = var.role
+  }
 }

@@ -1,102 +1,58 @@
-name: CI/CD Docker
+steps:
+  - name: Configure AWS credentials
+    uses: aws-actions/configure-aws-credentials@v4
+    with:
+      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      aws-region: ap-northeast-2
 
-on:
-  push:
-    branches: [ "main" ]
-    # paths:
-    #   - "Dockerfile"
-    #   - "docker-compose.yml"
-    #   - "src/**"
-    #   - "app/**"   
-  workflow_dispatch:
+  # 1) EC2에서 Role=was + running 인스턴스 조회
+  - name: Find EC2 instances by tag
+    id: find_ec2
+    shell: bash
+    run: |
+      set -euo pipefail
+      INSTANCE_IDS=$(aws ec2 describe-instances \
+        --region ap-northeast-2 \
+        --filters "Name=tag:Role,Values=was" "Name=instance-state-name,Values=running" \
+        --query "Reservations[].Instances[].InstanceId" \
+        --output text | xargs -n1 | sort -u | tr '\n' ' ')
+      if [ -z "$INSTANCE_IDS" ]; then
+        echo "No running EC2 instances with tag Role=was found."
+        exit 1
+      fi
+      echo "EC2_INSTANCE_IDS=$$INSTANCE_IDS" >> $$GITHUB_ENV
+      echo "Found EC2 instances: $INSTANCE_IDS"
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  # 2) 그 중 SSM에 Online으로 등록된 인스턴스만 필터링
+  - name: Filter to SSM-managed instances
+    id: filter_ssm
+    shell: bash
+    run: |
+      set -euo pipefail
+      read -r -a IDS <<< "${EC2_INSTANCE_IDS}"
+      IDS_CSV=$$(printf ",%s" "$${IDS[@]}"); IDS_CSV=${IDS_CSV:1}
+      SSM_INSTANCE_IDS=$(aws ssm describe-instance-information \
+        --region ap-northeast-2 \
+        --filters "Key=InstanceIds,Values=${IDS_CSV}" "Key=PingStatus,Values=Online" \
+        --query "InstanceInformationList[].InstanceId" \
+        --output text | xargs -n1 | sort -u | tr '\n' ' ')
+      if [ -z "$SSM_INSTANCE_IDS" ]; then
+        echo "No SSM-managed Online instances among: ${EC2_INSTANCE_IDS}"
+        echo "Hint: Install/enable SSM Agent, attach IAM role with AmazonSSMManagedInstanceCore, allow network to SSM endpoints."
+        exit 1
+      fi
+      echo "SSM_INSTANCE_IDS=$$SSM_INSTANCE_IDS" >> $$GITHUB_ENV
+      echo "Targeting SSM-managed instances: $SSM_INSTANCE_IDS"
 
-    steps:
-      # AWS 인증
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-2
-
-      # SSM 배포 실행
-      - name: Deploy via SSM
-        run: |
-
-          aws resourcegroupstaggingapi get-resources \
-            --tag-filters Key=Role,Values=was
-
-          aws ssm send-command \
-            --region ap-northeast-2 \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Role,Values=was" \
-            --comment "Sparse checkout deploy" \
-            --parameters 'commands=[
-              "set -e",
-
-              "cd /home/ykk-admin/app",
-
-              "echo \"📦 fetch latest changes\"",
-              "git fetch origin main",
-
-              "echo \"📂 update sparse directory only\"",
-              "git checkout origin/main -- 03_docker/was_server",
-
-              "echo \"🐳 restart docker compose\"",
-              "cd 03_docker/was_server",
-              "docker compose down || true",
-              "docker compose up -d --build",
-
-              "echo \"✅ deploy complete\""
-            ]'
-
-
-      # aws ssm send-command \
-      #   --document-name "AWS-RunShellScript" \
-      #   --targets "Key=tag:Role,Values=was" \
-      #   --targets "Key=tag:Name,Values=project02-was01" \
-      #   --targets "Key=tag:Name,Values=project02-was*" \
-      #   --targets "Key=tag:Name,Values=project02-was01,project02-was02" \
-      #   --parameters 'commands=[
-      #     "docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }}",
-      #     "cd /home/ubuntu/app",
-      #     "docker compose up -d"
-      #   ]'
-
-
-      # - name: Get EC2 ID by Name
-      #   run: |
-      #     INSTANCE_ID=$(aws ec2 describe-instances \
-      #       --filters "Name=tag:Name,Values=project02-was*" "Name=instance-state-name,Values=running" \
-      #       --query "Reservations[].Instances[].InstanceId" \
-      #       --output text)
-      #     echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
-
-      # - name: Deploy via SSM to WAS cluster
-      #   run: |
-      #     aws ssm send-command \
-      #       --document-name "AWS-RunShellScript" \
-      #       --targets "Key=instanceIds,Values=project02-was*" \
-      #       --parameters 'commands=[
-      #         "docker pull myrepo/myapp:latest",
-      #         "cd /home/ubuntu/app",
-      #         "docker compose up -d"
-      #       ]'      
-
-
-
-#docker compose -f /home/ubuntu/app/docker-compose.yml up -d
-
-
-
-          # aws ec2 describe-tags --filters "Name=resource-id,Values=i-065a08441dc47d998"
-
-          # aws ec2 describe-instances --region ap-northeast-2
-
-# aws resourcegroupstaggingapi get-resources \
-#   --tag-filters Key=Role,Values=was            
-            
+  # 3) SSM로 배포 명령 실행 (인스턴스 아이디로 대상 지정)
+  - name: Deploy via SSM
+    shell: bash
+    run: |
+      set -euo pipefail
+      aws ssm send-command \
+        --region ap-northeast-2 \
+        --document-name "AWS-RunShellScript" \
+        --instance-ids ${SSM_INSTANCE_IDS} \
+        --comment "Sparse checkout deploy" \
+        --parameters 'commands=["set -e","cd /home/ykk-admin/app","echo fetch latest changes","git fetch origin main","echo update sparse directory only","git checkout origin/main -- 03_docker/was_server","echo restart docker compose","cd 03_docker/was_server","docker compose down || true","docker compose up -d --build","echo deploy complete"]'

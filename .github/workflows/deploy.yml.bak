@@ -1,0 +1,102 @@
+name: CI/CD Docker
+
+on:
+  push:
+    branches: [ "main" ]
+    # paths:
+    #   - "Dockerfile"
+    #   - "docker-compose.yml"
+    #   - "src/**"
+    #   - "app/**"   
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # AWS 인증
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      # SSM 배포 실행
+      - name: Deploy via SSM
+        run: |
+
+          aws resourcegroupstaggingapi get-resources \
+            --tag-filters Key=Role,Values=was
+
+          aws ssm send-command \
+            --region ap-northeast-2 \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Role,Values=was" \
+            --comment "Sparse checkout deploy" \
+            --parameters 'commands=[
+              "set -e",
+
+              "cd /home/ykk-admin/app",
+
+              "echo \"📦 fetch latest changes\"",
+              "git fetch origin main",
+
+              "echo \"📂 update sparse directory only\"",
+              "git checkout origin/main -- 03_docker/was_server",
+
+              "echo \"🐳 restart docker compose\"",
+              "cd 03_docker/was_server",
+              "docker compose down || true",
+              "docker compose up -d --build",
+
+              "echo \"✅ deploy complete\""
+            ]'
+
+
+      # aws ssm send-command \
+      #   --document-name "AWS-RunShellScript" \
+      #   --targets "Key=tag:Role,Values=was" \
+      #   --targets "Key=tag:Name,Values=project02-was01" \
+      #   --targets "Key=tag:Name,Values=project02-was*" \
+      #   --targets "Key=tag:Name,Values=project02-was01,project02-was02" \
+      #   --parameters 'commands=[
+      #     "docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }}",
+      #     "cd /home/ubuntu/app",
+      #     "docker compose up -d"
+      #   ]'
+
+
+      # - name: Get EC2 ID by Name
+      #   run: |
+      #     INSTANCE_ID=$(aws ec2 describe-instances \
+      #       --filters "Name=tag:Name,Values=project02-was*" "Name=instance-state-name,Values=running" \
+      #       --query "Reservations[].Instances[].InstanceId" \
+      #       --output text)
+      #     echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+
+      # - name: Deploy via SSM to WAS cluster
+      #   run: |
+      #     aws ssm send-command \
+      #       --document-name "AWS-RunShellScript" \
+      #       --targets "Key=instanceIds,Values=project02-was*" \
+      #       --parameters 'commands=[
+      #         "docker pull myrepo/myapp:latest",
+      #         "cd /home/ubuntu/app",
+      #         "docker compose up -d"
+      #       ]'      
+
+
+
+#docker compose -f /home/ubuntu/app/docker-compose.yml up -d
+
+
+
+          # aws ec2 describe-tags --filters "Name=resource-id,Values=i-065a08441dc47d998"
+
+          # aws ec2 describe-instances --region ap-northeast-2
+
+# aws resourcegroupstaggingapi get-resources \
+#   --tag-filters Key=Role,Values=was            
+            

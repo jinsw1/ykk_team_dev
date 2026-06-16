@@ -7,11 +7,17 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/dev/conf.d:/etc/nginx/conf.d
+      - ./nginx/dev/conf.d:/etc/nginx/conf.d:ro
     # depends_on:
     #   - fastapi
     networks:
       - app-network
+
+  # fastapi:
+  #   image: your-dockerhub-user/myapp:latest
+  #   container_name: fastapi
+  #   expose:
+  #     - "8000"      
 
   # fastapi:
   #   image: ghcr.io/your-org/fastapi:latest

@@ -1,0 +1,36 @@
+---
+# 기존 삭제
+- name: Clean app directory
+  file:
+    path: /home/ykk-admin/app
+    state: absent
+
+- name: Create app directory
+  file:
+    path: /home/ykk-admin/app
+    state: directory
+
+# sparse clone
+- name: Clone repo without checkout
+  ansible.builtin.shell: |
+    git clone --no-checkout https://github.com/jinsw1/ykk_team_dev.git /home/ykk-admin/app
+
+# sparse 설정
+- name: Enable sparse checkout
+  ansible.builtin.shell: |
+    cd /home/ykk-admin/app
+    git sparse-checkout init --cone
+    git sparse-checkout set 03_docker/was_server
+
+# checkout
+- name: Checkout branch
+  ansible.builtin.shell: |
+    cd /home/ykk-admin/app
+    git checkout main
+
+# deploy
+- name: Run docker compose
+  ansible.builtin.shell: |
+    cd /home/ykk-admin/app/03_docker/was_server
+    docker compose up -d
+    

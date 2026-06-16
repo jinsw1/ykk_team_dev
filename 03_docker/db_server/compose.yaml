@@ -1,0 +1,12 @@
+services:
+  my-postgres:
+    image: postgres:15
+    container_name: my-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: scott
+      POSTGRES_PASSWORD: tiger
+      POSTGRES_DB: scott_db
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

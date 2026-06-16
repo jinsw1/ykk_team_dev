@@ -1,10 +1,16 @@
 ---
+- name: Check app directory
+  stat:
+    path: /home/ykk-admin/app
+  register: app_dir
+
 # 기존 삭제
 - name: Clean app directory
   file:
     path: /home/ykk-admin/app
     state: absent
-
+  when: app_dir.stat.exists
+  
 - name: Create app directory
   file:
     path: /home/ykk-admin/app
@@ -33,4 +39,3 @@
   ansible.builtin.shell: |
     cd /home/ykk-admin/app/03_docker/was_server
     docker compose up -d
-    

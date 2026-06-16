@@ -28,7 +28,8 @@ jobs:
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=project02-was*" \
+            # --targets "Key=tag:Name,Values=project02-was*" \
+            --targets "Key=tag:Name,Values=project02-was01,project02-was02"
             --comment "Sparse checkout deploy" \
             --parameters 'commands=[
               "set -e",

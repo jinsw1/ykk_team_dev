@@ -11,31 +11,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 코드 가져오기
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            03_docker/was_server
-          sparse-checkout-cone-mode: true
-
-
-      # 2. Docker Hub 로그인
-      - name: Docker login
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-
-      # # 3. 이미지 빌드
-      # - name: Build image
-      #   run: docker build -t ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }} .
-
-      # # 4. 이미지 Push
-      # - name: Push image
-      #   run: docker push ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }}
-
+      # AWS 인증
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -43,17 +23,30 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      - name: Deploy via SSM to WAS cluster
+      # SSM 배포 실행
+      - name: Deploy via SSM
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=tag:Name,Values=project02-was*" \
-            --parameters 'commands=[              
-              "cd /home/ubuntu/",
-              "git sparse-checkout init --cone"
-              "git sparse-checkout set was_server"
-              "git clone https://github.com/your-repo.git "
-              "docker compose up -d"
+            --comment "Sparse checkout deploy" \
+            --parameters 'commands=[
+              "set -e",
+
+              "cd /home/ykk-admin/app",
+
+              "echo \"📦 fetch latest changes\"",
+              "git fetch origin main",
+
+              "echo \"📂 update sparse directory only\"",
+              "git checkout origin/main -- 03_docker/was_server",
+
+              "echo \"🐳 restart docker compose\"",
+              "cd 03_docker/was_server",
+              "docker compose down || true",
+              "docker compose up -d --build",
+
+              "echo \"✅ deploy complete\""
             ]'
 
       # aws ssm send-command \

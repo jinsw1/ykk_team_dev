@@ -52,7 +52,7 @@ jobs:
 
           if [ -z "$TARGET_IDS" ]; then
             echo "No intersection between EC2 Role=was and SSM Online."
-            echo "Check SSM Agent/IAM Role (AmazonSSMManagedInstanceCore)/Network to SSM endpoints."
+            echo "Check SSM Agent, IAM role (AmazonSSMManagedInstanceCore), and network to SSM endpoints."
             exit 1
           fi
 

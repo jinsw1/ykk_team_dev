@@ -27,10 +27,10 @@ jobs:
       - name: Deploy via SSM
         run: |
           aws ssm describe-instance-information
-          
+
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:SSMRole,Values=was" \
+            --targets "Key=tag:Role,Values=was" \
             --comment "Sparse checkout deploy" \
             --parameters 'commands=[
               "set -e",

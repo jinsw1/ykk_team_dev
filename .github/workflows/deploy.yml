@@ -2,12 +2,8 @@ name: CI/CD Docker
 
 on:
   push:
-    branches: [ "main" ]
-    # paths:
-    #   - "Dockerfile"
-    #   - "docker-compose.yml"
-    #   - "src/**"
-    #   - "app/**"   
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -22,29 +18,42 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      - name: Deploy via SSM (Role=was, Online only)
-        shell: bash
+      - name: Find WAS instances
+        id: instances
         run: |
-          set -euo pipefail
-          REGION=ap-northeast-2
+          INSTANCE_IDS=$(aws ec2 describe-instances \
+            --region ap-northeast-2 \
+            --filters \
+              "Name=tag:Role,Values=was" \
+              "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
 
-          # SSM에서 태그 Role=was이면서 Online인 인스턴스만 추출
-          SSM_IDS=$(aws ssm describe-instance-information \
-            --region "$REGION" \
-            --filters "Key=tag:Role,Values=was" \
-            --query "InstanceInformationList[?PingStatus=='Online'].InstanceId" \
-            --output text | xargs -n1 | sort -u | tr '\n' ' ')
-
-          if [ -z "$SSM_IDS" ]; then
-            echo "No SSM Online instances with tag Role=was. Check agent/IAM/network."
+          if [ -z "$INSTANCE_IDS" ]; then
+            echo "No running WAS instances found"
             exit 1
           fi
 
-          echo "Targeting instances: $SSM_IDS"
+          echo "INSTANCE_IDS=$INSTANCE_IDS" >> $GITHUB_ENV
+          echo "Found: $INSTANCE_IDS"
 
+      - name: Deploy via SSM
+        run: |
           aws ssm send-command \
-            --region "$REGION" \
+            --region ap-northeast-2 \
             --document-name "AWS-RunShellScript" \
-            --instance-ids $SSM_IDS \
-            --comment "Sparse checkout deploy" \
-            --parameters 'commands=["set -e","cd /home/ykk-admin/app","echo Fetch latest changes","git fetch origin main","echo Update sparse directory only","git checkout origin/main -- 03_docker/was_server","echo Restart docker compose","cd 03_docker/was_server","docker compose down || true","docker compose up -d --build","echo Deploy complete"]'
+            --instance-ids $INSTANCE_IDS \
+            --comment "Docker Deploy" \
+            --parameters '{
+              "commands":[
+                "sudo -iu ykk-admin bash << EOF",
+                "set -e",
+                "cd /home/ykk-admin/app",
+                "git fetch origin main",
+                "git checkout origin/main -- 03_docker/was_server",
+                "cd /home/ykk-admin/app/03_docker/was_server",
+                "docker compose down || true",
+                "docker compose up -d --build",
+                "EOF"
+              ]
+            }'

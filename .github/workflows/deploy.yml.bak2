@@ -1,0 +1,50 @@
+name: CI/CD Docker
+
+on:
+  push:
+    branches: [ "main" ]
+    # paths:
+    #   - "Dockerfile"
+    #   - "docker-compose.yml"
+    #   - "src/**"
+    #   - "app/**"   
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Deploy via SSM (Role=was, Online only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          REGION=ap-northeast-2
+
+          # SSM에서 태그 Role=was이면서 Online인 인스턴스만 추출
+          SSM_IDS=$(aws ssm describe-instance-information \
+            --region "$REGION" \
+            --filters "Key=tag:Role,Values=was" \
+            --query "InstanceInformationList[?PingStatus=='Online'].InstanceId" \
+            --output text | xargs -n1 | sort -u | tr '\n' ' ')
+
+          if [ -z "$SSM_IDS" ]; then
+            echo "No SSM Online instances with tag Role=was. Check agent/IAM/network."
+            exit 1
+          fi
+
+          echo "Targeting instances: $SSM_IDS"
+
+          aws ssm send-command \
+            --region "$REGION" \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids $SSM_IDS \
+            --comment "Sparse checkout deploy" \
+            --parameters 'commands=["set -e","cd /home/ykk-admin/app","echo Fetch latest changes","git fetch origin main","echo Update sparse directory only","git checkout origin/main -- 03_docker/was_server","echo Restart docker compose","cd 03_docker/was_server","docker compose down || true","docker compose up -d --build","echo Deploy complete"]'

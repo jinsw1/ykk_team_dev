@@ -26,6 +26,8 @@ jobs:
       # SSM 배포 실행
       - name: Deploy via SSM
         run: |
+          aws ssm describe-instance-information
+          
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=tag:SSMRole,Values=was" \

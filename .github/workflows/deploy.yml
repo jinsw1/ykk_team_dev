@@ -22,9 +22,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      # 1) EC2에서 Role=was + running 인스턴스 조회
+      # 1) Role=was + running 인스턴스 ID 조회
       - name: Find EC2 instances by tag
-        id: find_ec2
         shell: bash
         run: |
           set -euo pipefail
@@ -37,38 +36,51 @@ jobs:
             echo "No running EC2 instances with tag Role=was found."
             exit 1
           fi
-          echo "EC2_INSTANCE_IDS=$$INSTANCE_IDS" >> $$GITHUB_ENV
+          echo "EC2_INSTANCE_IDS=$$INSTANCE_IDS" >> "$$GITHUB_ENV"
           echo "Found EC2 instances: $INSTANCE_IDS"
 
-      # 2) 그 중 SSM에 Online으로 등록된 인스턴스만 필터링
+      # 2) SSM Online 인스턴스만 필터링
       - name: Filter to SSM-managed instances
-        id: filter_ssm
         shell: bash
         run: |
           set -euo pipefail
-          read -r -a IDS <<< "${EC2_INSTANCE_IDS}"
-          IDS_CSV=$$(printf ",%s" "$${IDS[@]}"); IDS_CSV=${IDS_CSV:1}
+          EC2_IDS="${EC2_INSTANCE_IDS:-}"
+          if [ -z "$EC2_IDS" ]; then
+            echo "EC2_INSTANCE_IDS is not set from previous step."
+            exit 1
+          fi
+          read -r -a IDS <<< "$EC2_IDS"
+          if [ "${#IDS[@]}" -eq 0 ]; then
+            echo "No EC2 IDs parsed."
+            exit 1
+          fi
+          # 쉼표 CSV 생성
+          ( IFS=','; echo -n "CSV="; echo "${IDS[*]}" ) > ids.csv.tmp
+          . ./ids.csv.tmp
+          rm -f ids.csv.tmp
+
           SSM_INSTANCE_IDS=$(aws ssm describe-instance-information \
             --region ap-northeast-2 \
-            --filters "Key=InstanceIds,Values=${IDS_CSV}" "Key=PingStatus,Values=Online" \
+            --filters "Key=InstanceIds,Values=${CSV}" "Key=PingStatus,Values=Online" \
             --query "InstanceInformationList[].InstanceId" \
             --output text | xargs -n1 | sort -u | tr '\n' ' ')
           if [ -z "$SSM_INSTANCE_IDS" ]; then
-            echo "No SSM-managed Online instances among: ${EC2_INSTANCE_IDS}"
-            echo "Hint: Install/enable SSM Agent, attach IAM role with AmazonSSMManagedInstanceCore, allow network to SSM endpoints."
+            echo "No SSM-managed Online instances among: $EC2_IDS"
+            echo "Hint: Install/enable SSM Agent, attach IAM role with AmazonSSMManagedInstanceCore, and allow network to SSM endpoints."
             exit 1
           fi
-          echo "SSM_INSTANCE_IDS=$$SSM_INSTANCE_IDS" >> $$GITHUB_ENV
+          echo "SSM_INSTANCE_IDS=$$SSM_INSTANCE_IDS" >> "$$GITHUB_ENV"
           echo "Targeting SSM-managed instances: $SSM_INSTANCE_IDS"
 
-      # 3) SSM로 배포 명령 실행 (인스턴스 아이디로 대상 지정)
+      # 3) SSM로 배포 실행 (인스턴스 ID 직접 지정)
       - name: Deploy via SSM
         shell: bash
         run: |
           set -euo pipefail
+          echo "Sending command to: $SSM_INSTANCE_IDS"
           aws ssm send-command \
             --region ap-northeast-2 \
             --document-name "AWS-RunShellScript" \
             --instance-ids ${SSM_INSTANCE_IDS} \
             --comment "Sparse checkout deploy" \
-            --parameters 'commands=["set -e","cd /home/ykk-admin/app","echo fetch latest changes","git fetch origin main","echo update sparse directory only","git checkout origin/main -- 03_docker/was_server","echo restart docker compose","cd 03_docker/was_server","docker compose down || true","docker compose up -d --build","echo deploy complete"]'
+            --parameters 'commands=["set -e","cd /home/ykk-admin/app","echo Fetch latest changes","git fetch origin main","echo Update sparse directory only","git checkout origin/main -- 03_docker/was_server","echo Restart docker compose","cd 03_docker/was_server","docker compose down || true","docker compose up -d --build","echo Deploy complete"]'

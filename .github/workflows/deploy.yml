@@ -28,7 +28,7 @@ jobs:
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=project02-was01,project02-was02" \
+            --targets "Key=tag:Role,Values=was" \
             --comment "Sparse checkout deploy" \
             --parameters 'commands=[
               "set -e",
@@ -54,6 +54,7 @@ jobs:
       #   --document-name "AWS-RunShellScript" \
       #   --targets "Key=tag:Name,Values=project02-was01" \
       #   --targets "Key=tag:Name,Values=project02-was*" \
+      #   --targets "Key=tag:Name,Values=project02-was01,project02-was02" \
       #   --parameters 'commands=[
       #     "docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }}",
       #     "cd /home/ubuntu/app",

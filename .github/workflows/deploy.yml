@@ -1,0 +1,81 @@
+name: CI/CD Docker
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "src/**"
+      - "app/**"   
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 코드 가져오기
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Docker Hub 로그인
+      - name: Docker login
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # 3. 이미지 빌드
+      - name: Build image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }} .
+
+      # 4. 이미지 Push
+      - name: Push image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Deploy via SSM to WAS cluster
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Name,Values=project02-was*" \
+            --parameters 'commands=[
+              "docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${{ github.sha }}",
+              "cd /home/ubuntu/app",
+              "docker compose up -d"
+            ]'
+
+
+
+
+      # - name: Get EC2 ID by Name
+      #   run: |
+      #     INSTANCE_ID=$(aws ec2 describe-instances \
+      #       --filters "Name=tag:Name,Values=project02-was*" "Name=instance-state-name,Values=running" \
+      #       --query "Reservations[].Instances[].InstanceId" \
+      #       --output text)
+      #     echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+
+      # - name: Deploy via SSM to WAS cluster
+      #   run: |
+      #     aws ssm send-command \
+      #       --document-name "AWS-RunShellScript" \
+      #       --targets "Key=instanceIds,Values=project02-was*" \
+      #       --parameters 'commands=[
+      #         "docker pull myrepo/myapp:latest",
+      #         "cd /home/ubuntu/app",
+      #         "docker compose up -d"
+      #       ]'      
+
+
+
+#docker compose -f /home/ubuntu/app/docker-compose.yml up -d
+
+
+
+
+            
+            

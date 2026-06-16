@@ -1,0 +1,69 @@
+---
+- name: 1. 충돌 방지를 위한 기존 패키지 완벽 제거
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-doc
+      - docker-compose
+      - docker-compose-v2
+      - podman-docker
+      - containerd
+      - runc
+    state: absent
+
+- name: 2. 패키지 리스트 업데이트 및 필수 보안 통신 도구 설치
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+    update_cache: yes
+
+- name: 3. Docker 공식 GPG 키 저장 디렉토리 생성 및 권한 부여
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: 4. Docker 공식 GPG 키 다운로드 및 시스템 등록
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644' # a+r과 동일한 권한
+
+- name: 5-1. 시스템 아키텍처 동적 확인 (amd64, arm64 등)
+  ansible.builtin.command: dpkg --print-architecture
+  register: dpkg_arch
+  changed_when: false # 상태 변경이 없는 읽기 전용 커맨드임을 명시
+
+- name: 5-2. Docker 공식 저장소(Repository) 주소 시스템 등록
+  ansible.builtin.apt_repository:
+    # 동적으로 아키텍처(dpkg_arch)와 OS 코드네임(ansible_distribution_release=noble)을 매핑합니다.
+    repo: "deb [arch={{ dpkg_arch.stdout }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+    update_cache: yes
+
+- name: 7. 지정된 Docker 엔진 및 플러그인(28.5.1) 강제 버전 지정 설치
+  ansible.builtin.apt:
+    name:
+      - docker-ce=5:28.5.1-1~ubuntu.24.04~noble
+      - docker-ce-cli=5:28.5.1-1~ubuntu.24.04~noble
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+- name: 8. Docker 자동 업그레이드 원천 차단 (버전 고정, apt-mark hold)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - docker-ce
+    - docker-ce-cli
+
+- name: 9. 현재 로그인한 사용자(ansible_user)에게 Docker 제어 권한 부여
+  ansible.builtin.user:
+    name: "{{ ansible_user }}" # 앤서블이 SSH로 접속할 때 사용한 계정 (예: ubuntu)
+    groups: docker
+    append: yes # 기존 그룹을 유지하면서 docker 그룹만 추가

@@ -1,0 +1,113 @@
+#~/ansible/roles/common/tasks/main.yml
+---
+# ==========================================
+# 1. OS 기본 보안 및 타임존 설정 (common)
+# ==========================================
+
+# timezone
+- name: Set timezone to Asia/Seoul
+  ansible.builtin.timezone:
+    name: Asia/Seoul
+
+# chrony (AWS Linux 호환)
+- name: Install chrony
+  ansible.builtin.package:
+    name: chrony
+    state: present
+
+- name: Enable and start chrony service
+  ansible.builtin.service:
+    name: chronyd
+    state: started
+    enabled: yes
+
+# ==========================================
+# 2. Password Policy (AWS Linux safe 방식)
+# ==========================================
+
+- name: Set password max age (root)
+  ansible.builtin.command: chage -M 90 root
+  changed_when: false
+
+- name: Set password min age (root)
+  ansible.builtin.command: chage -m 7 root
+  changed_when: false
+
+- name: Set password warning age (root)
+  ansible.builtin.command: chage -W 7 root
+  changed_when: false
+
+- name: Configure faillock deny count
+  ansible.builtin.lineinfile:
+    path: /etc/security/faillock.conf
+    regexp: '^deny'
+    line: "deny = 5"
+    create: true
+
+# ==========================================
+# 3. Package Security
+# ==========================================
+
+- name: Remove insecure packages (Amazon Linux safe)
+  ansible.builtin.package:
+    name:
+      - telnet
+      - rsh
+      - rsh-server
+    state: absent
+
+# ==========================================
+# 4. Audit Log
+# ==========================================
+
+- name: Install auditd
+  ansible.builtin.package:
+    name: auditd
+    state: present
+
+- name: Enable auditd service
+  ansible.builtin.service:
+    name: auditd
+    state: started
+    enabled: true
+
+# ==========================================
+# 5. SYSCTL Security (safe for AL2/AL2023)
+# ==========================================
+
+- name: Enable ASLR
+  ansible.posix.sysctl:
+    name: kernel.randomize_va_space
+    value: '2'
+    state: present
+    reload: true
+
+- name: Enable TCP SYN Cookies
+  ansible.posix.sysctl:
+    name: net.ipv4.tcp_syncookies
+    value: '1'
+    state: present
+    reload: true
+
+- name: Disable ICMP Redirect
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.all.accept_redirects
+    value: '0'
+    state: present
+    reload: true
+
+- name: Disable Source Route
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.all.accept_source_route
+    value: '0'
+    state: present
+    reload: true
+
+# ==========================================
+# 6. OS Security Update (주의: 운영에서는 선택 실행 권장)
+# ==========================================
+
+- name: Install security updates (Amazon Linux safe)
+  ansible.builtin.package:
+    name: "*"
+    state: latest

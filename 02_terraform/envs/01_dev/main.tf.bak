@@ -1,0 +1,706 @@
+############################################
+# 00. TERRAFORM / PROVIDER 설정
+############################################
+terraform {
+  required_version = ">=1.14.0, <1.16.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+    tailscale = {
+      source  = "tailscale/tailscale"
+      version = "0.17.2"
+    }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "ap-northeast-2"
+}
+
+provider "tailscale" {
+  api_key = var.tailscale_api_key
+  tailnet = var.tailnet_name
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
+
+############################################
+# 01. DATA SOURCES (AMI / AZ / DNS Zone)
+############################################
+data "aws_ami" "latest_al2023" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023*-x86_64"]
+  }
+}
+
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+# data "cloudflare_zones" "main" {
+#   filter {
+#     name = var.domain_name
+#   }
+# }
+
+# locals {
+#   zone_id = data.cloudflare_zones.main.zones[0].id
+# }
+
+data "cloudflare_zones" "main" {
+  name = var.domain_name
+}
+
+locals {
+  zone_id = data.cloudflare_zones.main.result[0].id
+}
+
+# data "cloudflare_zone" "main" {
+#   zone_id = var.cloudflare_zone_id
+# }
+
+############################################
+# 02. TAILSCALE KEY (EC2 등록용)
+############################################
+resource "tailscale_tailnet_key" "ec2_join_key" {
+  reusable      = true
+  ephemeral     = true
+  preauthorized = true
+  expiry        = 3600
+}
+
+
+############################################
+# 03. VPC / IGW (네트워크 베이스)
+############################################
+module "project02_vpc" {
+  source     = "../../modules/vpc"
+  cidr_block = "10.0.0.0/16"
+  name       = "project02-vpc"
+}
+
+module "igw" {
+  source = "../../modules/internet-gateway"
+  vpc_id = module.project02_vpc.vpc_id
+  name   = "project02-igw"
+}
+
+
+############################################
+# 04. SUBNET 구성 (Public / Private 분리)
+############################################
+
+# Private Subnet - Infra / WAS / DB
+module "project02_private_subnet_infra" {
+  source        = "../../modules/subnet"
+  vpc_id        = module.project02_vpc.vpc_id
+  cidr_block    = "10.0.10.0/24"
+  az            = data.aws_availability_zones.available.names[0]
+  map_public_ip = false
+  name          = "project02-private-infra"
+}
+
+module "project02_private_subnet_was" {
+  source        = "../../modules/subnet"
+  vpc_id        = module.project02_vpc.vpc_id
+  cidr_block    = "10.0.20.0/24"
+  az            = data.aws_availability_zones.available.names[0]
+  map_public_ip = false
+  name          = "project02-private-was"
+}
+
+module "project02_private_subnet_db" {
+  source        = "../../modules/subnet"
+  vpc_id        = module.project02_vpc.vpc_id
+  cidr_block    = "10.0.30.0/24"
+  az            = data.aws_availability_zones.available.names[0]
+  map_public_ip = false
+  name          = "project02-private-db"
+}
+
+# Public Subnet - NAT / ALB
+module "project02_public_subnet_nat" {
+  source        = "../../modules/subnet"
+  vpc_id        = module.project02_vpc.vpc_id
+  cidr_block    = "10.0.1.0/24"
+  az            = data.aws_availability_zones.available.names[0]
+  map_public_ip = true
+  name          = "project02-public-nat"
+}
+
+module "project02_public_subnet_alb_a" {
+  source        = "../../modules/subnet"
+  vpc_id        = module.project02_vpc.vpc_id
+  cidr_block    = "10.0.2.0/24"
+  az            = data.aws_availability_zones.available.names[0]
+  map_public_ip = true
+  name          = "project02-public-alb-a"
+}
+
+module "project02_public_subnet_alb_b" {
+  source        = "../../modules/subnet"
+  vpc_id        = module.project02_vpc.vpc_id
+  cidr_block    = "10.0.3.0/24"
+  az            = data.aws_availability_zones.available.names[1]
+  map_public_ip = true
+  name          = "project02-public-alb-b"
+}
+
+
+############################################
+# 05. NAT INSTANCE (프라이빗 인터넷 게이트)
+############################################
+resource "aws_security_group" "nat_sg" {
+  vpc_id = module.project02_vpc.vpc_id
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_instance" "nat_instance" {
+  ami                         = data.aws_ami.latest_al2023.id
+  instance_type               = "t3.micro"
+  subnet_id                   = module.project02_public_subnet_nat.subnet_id
+  associate_public_ip_address = true
+
+  source_dest_check      = false
+  vpc_security_group_ids = [aws_security_group.nat_sg.id]
+
+  user_data = <<-EOF
+    #!/bin/bash
+    set -eux
+
+    echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-nat.conf
+    sysctl -p /etc/sysctl.d/99-nat.conf
+
+    dnf install -y iptables iptables-services
+    systemctl enable --now iptables
+
+    iptables -P FORWARD ACCEPT
+    iptables -I FORWARD -j ACCEPT	
+    iptables -t nat -A POSTROUTING -s ${module.project02_vpc.cidr_block} -j MASQUERADE
+
+	service iptables save
+  EOF
+
+  tags = {
+    Name = "nat-instance"
+  }
+
+  depends_on = [module.igw]
+}
+
+resource "aws_eip" "nat" {
+  domain = "vpc"
+}
+
+resource "aws_eip_association" "nat" {
+  instance_id   = aws_instance.nat_instance.id
+  allocation_id = aws_eip.nat.id
+}
+
+
+############################################
+# 06. ROUTE TABLE (PUBLIC / PRIVATE)
+############################################
+
+# Public Route Table
+resource "aws_route_table" "public_rt" {
+  vpc_id = module.project02_vpc.vpc_id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = module.igw.igw_id
+  }
+}
+
+# Private Route Table (NAT Instance)
+resource "aws_route_table" "private_rt" {
+  vpc_id = module.project02_vpc.vpc_id
+
+  route {
+    cidr_block          = "0.0.0.0/0"
+    network_interface_id = aws_instance.nat_instance.primary_network_interface_id
+  }
+}
+
+# Associations
+
+resource "aws_route_table_association" "public_nat_rt" {
+  subnet_id      = module.project02_public_subnet_nat.subnet_id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_route_table_association" "infra_rt" {
+  subnet_id      = module.project02_private_subnet_infra.subnet_id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_route_table_association" "was_rt" {
+  subnet_id      = module.project02_private_subnet_was.subnet_id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_route_table_association" "db_rt" {
+  subnet_id      = module.project02_private_subnet_db.subnet_id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_route_table_association" "alb_a" {
+  subnet_id      = module.project02_public_subnet_alb_a.subnet_id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_route_table_association" "alb_b" {
+  subnet_id      = module.project02_public_subnet_alb_b.subnet_id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+
+############################################
+# 07. SECURITY GROUP (APP LAYER)
+############################################
+module "project02_infra_sg" {
+  source = "../../modules/security-group"
+  name   = "project02-infra-sg"
+  vpc_id = module.project02_vpc.vpc_id
+
+  ingress_rules = [
+    { from_port = 22, to_port = 22, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"], description = "SSH" },
+    { from_port = 80, to_port = 80, protocol = "tcp", cidr_blocks = ["0.0.0.0/0"], description = "HTTP" },
+    { from_port = -1, to_port = -1, protocol = "icmp", cidr_blocks = ["10.0.0.0/16"], description = "ICMP" }
+  ]
+
+  egress_rules = [
+    { from_port = 0, to_port = 0, protocol = "-1", cidr_blocks = ["0.0.0.0/0"] }
+  ]
+}
+
+module "project02_was_sg" {
+  source = "../../modules/security-group"
+  name   = "project02-was-sg"
+  vpc_id = module.project02_vpc.vpc_id
+
+  ingress_rules = [
+    {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "SSH"
+    },
+    {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "HTTP"
+    },
+    {
+      from_port   = -1
+      to_port     = -1
+      protocol    = "icmp"
+      cidr_blocks = ["10.0.0.0/16"]
+      description = "ICMP (internal test)"
+    }	
+  ]
+
+  egress_rules = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
+module "project02_db_sg" {
+  source = "../../modules/security-group"
+  name   = "project02-db-sg"
+  vpc_id = module.project02_vpc.vpc_id
+
+  ingress_rules = [
+    {
+      from_port   = 5432
+      to_port     = 5432
+      protocol    = "tcp"
+      cidr_blocks = ["10.0.10.0/24"]
+      description = "WAS to DB"
+    },
+    {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "SSH"
+    },
+    {
+      from_port   = -1
+      to_port     = -1
+      protocol    = "icmp"
+      cidr_blocks = ["10.0.0.0/16"]
+      description = "ICMP (internal test)"
+    }
+
+  ]
+
+  egress_rules = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
+module "project02_alb_sg" {
+  source = "../../modules/security-group"
+
+  name   = "project02-alb-sg"
+  vpc_id = module.project02_vpc.vpc_id
+
+  ingress_rules = [
+    {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "HTTP"
+    },
+    {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "HTTPS"
+    }
+  ]
+
+  egress_rules = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
+
+############################################
+# 08. APPLICATION LOAD BALANCER
+############################################
+module "project02_alb" {
+  source = "../../modules/alb"
+
+  name   = "project02-alb"
+  vpc_id = module.project02_vpc.vpc_id
+
+  subnets = [
+    module.project02_public_subnet_alb_a.subnet_id,
+    module.project02_public_subnet_alb_b.subnet_id
+  ]
+
+  security_groups = [
+    module.project02_alb_sg.sg_id
+  ]
+}
+
+
+############################################
+# 09. ACM (HTTPS 인증서)
+############################################
+module "project02_acm" {
+  source      = "../../modules/acm"
+  domain_name = var.domain_name
+}
+
+
+############################################
+# 10. ACM DNS VALIDATION (Cloudflare)
+############################################
+module "project02_acm_dns" {
+  source  = "../../modules/cloudflare-dns"
+  zone_id = local.zone_id
+
+  name = tolist(module.project02_acm.domain_validation_options)[0].resource_record_name
+  type = tolist(module.project02_acm.domain_validation_options)[0].resource_record_type
+  content = tolist(module.project02_acm.domain_validation_options)[0].resource_record_value
+#   name    = module.project02_acm.domain_validation_options[0].resource_record_name
+#   type    = module.project02_acm.domain_validation_options[0].resource_record_type
+#   content = module.project02_acm.domain_validation_options[0].resource_record_value
+
+  proxied = false
+}
+
+resource "aws_acm_certificate_validation" "this" {
+  certificate_arn = module.project02_acm.cert_arn
+
+  validation_record_fqdns = [
+    module.project02_acm_dns.fqdn
+  ]
+}
+
+
+############################################
+# 11. ALB LISTENER (HTTP → HTTPS)
+############################################
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = module.project02_alb.alb_arn
+
+  port     = 80
+  protocol = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = module.project02_alb.alb_arn
+
+  port            = 443
+  protocol        = "HTTPS"
+  ssl_policy      = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+
+  certificate_arn = aws_acm_certificate_validation.this.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = module.project02_alb.tg_arn
+  }
+}
+
+
+############################################
+# 12. TARGET GROUP ATTACHMENT (WAS)
+############################################
+resource "aws_lb_target_group_attachment" "was1" {
+  target_group_arn = module.project02_alb.tg_arn
+  target_id        = module.project02_was01_ec2.instance_id
+  port             = 80
+}
+
+resource "aws_lb_target_group_attachment" "was2" {
+  target_group_arn = module.project02_alb.tg_arn
+  target_id        = module.project02_was02_ec2.instance_id
+  port             = 80
+}
+
+
+############################################
+# 13. CLOUDFLARE DNS (www → ALB)
+############################################
+module "project02_dns" {
+  source  = "../../modules/cloudflare-dns"
+  zone_id = local.zone_id
+
+  name    = "www"
+  type    = "CNAME"
+  content = module.project02_alb.dns_name
+
+  proxied = true
+}
+
+
+############################################
+# 14. EC2 + IAM + TAILSCALE (컴퓨트)
+############################################
+resource "aws_iam_role" "ssm_role" {
+  name = "project02-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_attach" {
+  role       = aws_iam_role.ssm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ssm_profile" {
+  name = "project02-ssm-profile"
+  role = aws_iam_role.ssm_role.name
+}
+
+
+############################################
+# KEYPAIR
+############################################
+module "project02_infra_ec2_key" {
+  source   = "../../modules/keypair"
+  key_name = "project02-infra-key"
+}
+
+module "project02_was_ec2_key" {
+  source   = "../../modules/keypair"
+  key_name = "project02-was-key"
+}
+
+module "project02_db_ec2_key" {
+  source   = "../../modules/keypair"
+  key_name = "project02-db-key"
+}
+
+############################################
+# 15. EC2 INSTANCES (Infra / WAS / DB)
+############################################
+module "project02_infra_ec2" {
+  source             = "../../modules/ec2"
+  instance_type      = "t3.micro"
+  subnet_id          = module.project02_private_subnet_infra.subnet_id
+  security_group_ids = [module.project02_infra_sg.sg_id]
+  key_name           = module.project02_infra_ec2_key.key_name
+  name               = "project02-infra"
+
+  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+
+  user_data = <<-EOF
+    #!/bin/bash
+    set -eux
+
+    until curl -s https://pkgs.tailscale.com >/dev/null; do
+      sleep 5
+    done
+
+    curl -fsSL https://tailscale.com/install.sh | sh
+
+    systemctl enable tailscaled
+    systemctl start tailscaled
+
+    cat >/etc/sysctl.d/99-tailscale.conf <<SYSCTL
+    net.ipv4.ip_forward = 1
+    net.ipv6.conf.all.forwarding = 1
+    SYSCTL
+
+    sysctl --system
+
+    tailscale up \
+      --auth-key=${var.tailscale_auth_key} \
+      --hostname=project02 \
+      --advertise-routes=10.0.0.0/16 \
+      --accept-routes \
+      --ssh
+  EOF
+}
+
+module "project02_was01_ec2" {
+  source             = "../../modules/ec2"
+  instance_type      = "t3.micro"
+  subnet_id          = module.project02_private_subnet_was.subnet_id
+  security_group_ids = [module.project02_was_sg.sg_id]
+  key_name           = module.project02_was_ec2_key.key_name
+  name               = "project02-was01"
+
+  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name 
+}
+
+module "project02_was02_ec2" {
+  source             = "../../modules/ec2"
+  instance_type      = "t3.micro"
+  subnet_id          = module.project02_private_subnet_was.subnet_id
+  security_group_ids = [module.project02_was_sg.sg_id]
+  key_name           = module.project02_was_ec2_key.key_name
+  name               = "project02-was02"
+
+  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name 
+}
+
+module "project02_db_ec2" {
+  source             = "../../modules/ec2"
+  instance_type      = "t3.micro"
+  subnet_id          = module.project02_private_subnet_db.subnet_id
+  security_group_ids = [module.project02_db_sg.sg_id]
+  key_name           = module.project02_db_ec2_key.key_name
+  name               = "project02-db"
+
+  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+}
+
+
+############################################
+# 16. TAILSCALE ROUTE 승인
+############################################
+resource "time_sleep" "wait_for_tailscale_sync" {
+  depends_on      = [module.project02_infra_ec2]
+  create_duration = "180s"
+}
+
+data "tailscale_device" "my_ec2_device" {
+  hostname = "project02"
+  wait_for = "180s"
+
+  depends_on = [time_sleep.wait_for_tailscale_sync]
+}
+
+resource "tailscale_device_subnet_routes" "approve_vpc_routes" {
+  device_id = data.tailscale_device.my_ec2_device.id
+  routes    = ["10.0.0.0/16"]
+}
+
+
+############################################
+# 17. OUTPUT
+############################################
+output "instance_was_private_ip" {
+  value = module.project02_was01_ec2.private_ip
+}
+
+output "instance_db_private_ip" {
+  value = module.project02_db_ec2.private_ip
+}
+
+
+############################################
+# 18. VARIABLES
+############################################
+variable "tailnet_name" {}
+variable "tailscale_auth_key" { sensitive = true }
+variable "tailscale_api_key" { sensitive = true }
+variable "cloudflare_api_token" { sensitive = true }
+variable "domain_name" {}
+variable "host_name" {
+  default = "aws-ec2"
+}
+variable "cloudflare_zone_id" {
+  default = "a9804b3e48b7f9f8ce542068cee0b604"
+}

@@ -1,0 +1,44 @@
+---
+
+- name: 1. ykk-admin 그룹 생성
+  ansible.builtin.group:
+    name: ykk-admin
+    state: present
+
+- name: 2. ykk-admin 유저 생성 및 그룹 지정
+  ansible.builtin.user:
+    name: ykk-admin
+    group: ykk-admin
+    shell: /bin/bash
+    create_home: yes
+    state: present
+
+- name: debug home
+  debug:
+    msg:
+      - "ansible_user={{ ansible_user }}"
+      - "home={{ lookup('env','HOME') }}"
+
+# 키생성
+- name: ykkadmin keygen
+  delegate_to: localhost
+  run_once: true
+  become: no # sudo 안쓰기
+  command: >
+    ssh-keygen -t rsa -b 4096
+    -f {{ lookup('env', 'HOME') }}/.ssh/ykkadmin-key.pem
+    -N ""
+  args:
+    creates: "{{ lookup('env','HOME') }}/.ssh/ykkadmin-key.pem"
+
+- name: ykkadmin key 등록
+  ansible.posix.authorized_key:
+    user: ykk-admin
+    key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/ykkadmin-key.pem.pub') }}"
+
+- name: 4. ykk-admin 계정에 패스워드 없는 sudo 권한 부여
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/ykk-admin
+    content: "ykk-admin ALL=(ALL) NOPASSWD:ALL\n"
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s

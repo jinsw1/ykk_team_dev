@@ -1,0 +1,67 @@
+# =========================
+# Terraform
+# =========================
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI config
+#.terraform.lock.hcl
+
+# Plan files (절대 커밋 금지)
+*.tfplan
+
+# Backend config (환경에 따라 민감)
+backend.tfvars
+
+# =========================
+# Ansible
+# =========================
+ansible/inventories/*/group_vars/secrets.yml
+ansible/inventories/*/host_vars/*/secrets.yml
+
+# Ansible runtime artifacts
+*.retry
+
+# Vault files (암호화 파일이라도 보통 제외하거나 정책에 따라 관리)
+*.vault
+*.vault.yml
+
+# =========================
+# Scripts / runtime outputs
+# =========================
+scripts/*.log
+inventory*.ini.bak
+inventory*.tmp
+
+# =========================
+# SSH / Keys
+# =========================
+*.pem
+*.key
+*.pub
+
+# SSH config (로컬 개인 설정)
+.ssh/
+
+# =========================
+# OS / IDE
+# =========================
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# CI/CD secrets
+# =========================
+.env
+.env.*
+secrets.yml

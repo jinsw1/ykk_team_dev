@@ -1,0 +1,29 @@
+services:
+  nginx:
+    image: nginx:latest
+    container_name: was-nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/dev/conf.d:/etc/nginx/conf.d
+    # depends_on:
+    #   - fastapi
+    networks:
+      - app-network
+
+  # fastapi:
+  #   image: ghcr.io/your-org/fastapi:latest
+  #   container_name: was-fastapi
+  #   restart: always
+  #   expose:
+  #     - "8000"
+  #   env_file:
+  #     - ./env/.env.dev   # 기본값 (override에서 변경)
+  #   networks:
+  #     - app-network
+
+networks:
+  app-network:
+    driver: bridge

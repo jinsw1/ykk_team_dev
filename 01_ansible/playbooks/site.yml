@@ -1,0 +1,28 @@
+#~/ansible/playbooks/site.yml
+---
+# =================================================================
+# [1단계] 모든 서버 공통 환경 및 보안 구성 (KISA 가이드 반영)
+# =================================================================
+- name: ""
+  hosts: all
+  become: yes
+  roles:
+    - role: common
+      tags: [common, security]
+
+# # =================================================================
+# # [2단계] 모든 서버 컨테이너 구동 환경 (Docker) 구축
+# # =================================================================
+# - hosts: all
+#   become: yes
+#   roles:
+#     - role: docker
+#       tags: [docker, base]
+
+
+- name: ""
+  hosts: all
+  become: yes
+  roles:
+    - role: docker
+      tags: [common, security]

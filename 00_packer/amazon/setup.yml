@@ -1,0 +1,34 @@
+# ./packer/amazon/setup.yml
+---
+- name: Base image setup
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Install git
+      dnf:
+        name: git
+        state: present
+
+    - name: Install docker
+      dnf:
+        name: docker
+        state: present
+
+    - name: Start and enable docker
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: true
+
+    - name: Install docker compose plugin
+      shell: |
+        mkdir -p /usr/local/lib/docker/cli-plugins/
+        curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose
+        chmod +x /usr/local/lib/docker/cli-plugins/docker-compose

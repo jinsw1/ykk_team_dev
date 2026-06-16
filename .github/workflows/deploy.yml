@@ -50,7 +50,7 @@ jobs:
             ]'
 
 
-      # aws ssm send-command \123
+      # aws ssm send-command \
       #   --document-name "AWS-RunShellScript" \
       #   --targets "Key=tag:Name,Values=project02-was01" \
       #   --targets "Key=tag:Name,Values=project02-was*" \

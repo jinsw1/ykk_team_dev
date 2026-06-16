@@ -1,3 +1,19 @@
+name: CI/CD Docker
+
+on:
+  push:
+    branches: [ "main" ]
+    # paths:
+    #   - "Dockerfile"
+    #   - "docker-compose.yml"
+    #   - "src/**"
+    #   - "app/**"   
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
 steps:
   - name: Configure AWS credentials
     uses: aws-actions/configure-aws-credentials@v4

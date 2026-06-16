@@ -22,46 +22,29 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      - name: Resolve targets and deploy via SSM
+      - name: Deploy via SSM (Role=was, Online only)
         shell: bash
         run: |
           set -euo pipefail
           REGION=ap-northeast-2
 
-          # EC2: Role=was + running 인스턴스 목록
-          EC2_IDS=$(aws ec2 describe-instances \
+          # SSM에서 태그 Role=was이면서 Online인 인스턴스만 추출
+          SSM_IDS=$(aws ssm describe-instance-information \
             --region "$REGION" \
-            --filters "Name=tag:Role,Values=was" "Name=instance-state-name,Values=running" \
-            --query "Reservations[].Instances[].InstanceId" \
-            --output text)
-
-          # SSM: Online 관리 인스턴스 목록
-          SSM_ONLINE_IDS=$(aws ssm describe-instance-information \
-            --region "$REGION" \
+            --filters "Key=tag:Role,Values=was" \
             --query "InstanceInformationList[?PingStatus=='Online'].InstanceId" \
-            --output text)
+            --output text | xargs -n1 | sort -u | tr '\n' ' ')
 
-          echo "EC2 Role=was running: ${EC2_IDS:-<none>}"
-          echo "SSM Online: ${SSM_ONLINE_IDS:-<none>}"
-
-          # 교집합(EC2 Role=was ∩ SSM Online)
-          TARGET_IDS=$(comm -12 \
-            <(echo "$$EC2_IDS" | tr ' \t' '\n' | sed '/^$$/d' | sort -u) \
-            <(echo "$$SSM_ONLINE_IDS" | tr ' \t' '\n' | sed '/^$$/d' | sort -u) \
-            | tr '\n' ' ')
-
-          if [ -z "$TARGET_IDS" ]; then
-            echo "No intersection between EC2 Role=was and SSM Online."
-            echo "Check SSM Agent, IAM role (AmazonSSMManagedInstanceCore), and network to SSM endpoints."
+          if [ -z "$SSM_IDS" ]; then
+            echo "No SSM Online instances with tag Role=was. Check agent/IAM/network."
             exit 1
           fi
 
-          echo "Targeting instances: $TARGET_IDS"
+          echo "Targeting instances: $SSM_IDS"
 
-          # SSM로 배포 실행
           aws ssm send-command \
             --region "$REGION" \
             --document-name "AWS-RunShellScript" \
-            --instance-ids $TARGET_IDS \
+            --instance-ids $SSM_IDS \
             --comment "Sparse checkout deploy" \
             --parameters 'commands=["set -e","cd /home/ykk-admin/app","echo Fetch latest changes","git fetch origin main","echo Update sparse directory only","git checkout origin/main -- 03_docker/was_server","echo Restart docker compose","cd 03_docker/was_server","docker compose down || true","docker compose up -d --build","echo Deploy complete"]'

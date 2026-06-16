@@ -47,7 +47,7 @@ jobs:
               echo "No running EC2 instances with tag Role=was."
               exit 1
             fi
-            CSV=$$(echo "$$EC2_IDS" | xargs -n1 | paste -sd, -)
+            CSV=$(echo "$EC2_IDS" | xargs -n1 | paste -sd, -)
             SSM_IDS=$(aws ssm describe-instance-information \
               --region "$REGION" \
               --filters "Key=InstanceIds,Values=${CSV}" "Key=PingStatus,Values=Online" \

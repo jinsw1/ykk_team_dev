@@ -49,7 +49,8 @@ jobs:
               "echo \"✅ deploy complete\""
             ]'
 
-      # aws ssm send-command \
+
+      # aws ssm send-command \123
       #   --document-name "AWS-RunShellScript" \
       #   --targets "Key=tag:Name,Values=project02-was01" \
       #   --targets "Key=tag:Name,Values=project02-was*" \

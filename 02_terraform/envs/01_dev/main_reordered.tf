@@ -414,6 +414,11 @@ module "project02_was01_ec2" {
   key_name             = module.project02_was_ec2_key.key_name
   name                 = "project02-was01"
   iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+  tags = {
+    Name = "project02-was01"
+    Role = "was"
+    Env  = "prod"
+  }  
 }
 
 module "project02_was02_ec2" {
@@ -424,6 +429,11 @@ module "project02_was02_ec2" {
   key_name             = module.project02_was_ec2_key.key_name
   name                 = "project02-was02"
   iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+  tags = {
+    Name = "project02-was02"
+    Role = "was"
+    Env  = "prod"
+  } 
 }
 
 module "project02_db_ec2" {

@@ -28,6 +28,8 @@ jobs:
         run: |
           aws ec2 describe-tags --filters "Name=resource-id,Values=i-065a08441dc47d998"
 
+          aws ec2 describe-instances --region ap-northeast-2
+          
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=tag:Role,Values=was" \

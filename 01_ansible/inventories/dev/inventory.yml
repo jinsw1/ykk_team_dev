@@ -2,19 +2,19 @@
   "children":
     "ykk_db":
       "hosts":
-        "10.0.30.132":
+        "10.0.30.71":
           "ansible_ssh_private_key_file": "~/.ssh/ykkadmin-key.pem"
           "ansible_user": "ykk-admin"
     "ykk_infra":
       "hosts":
-        "10.0.10.29":
+        "10.0.10.96":
           "ansible_ssh_private_key_file": "~/.ssh/ykkadmin-key.pem"
           "ansible_user": "ykk-admin"
     "ykk_was":
       "hosts":
-        "10.0.20.93":
+        "10.0.20.84":
           "ansible_ssh_private_key_file": "~/.ssh/ykkadmin-key.pem"
           "ansible_user": "ykk-admin"
-        "10.0.21.48":
+        "10.0.21.217":
           "ansible_ssh_private_key_file": "~/.ssh/ykkadmin-key.pem"
           "ansible_user": "ykk-admin"

@@ -177,13 +177,14 @@ resource "aws_instance" "nat_instance" {
   tags       = { Name = "nat-instance" }
 }
 
-resource "aws_eip" "nat" {
-  domain = "vpc"
-}
-resource "aws_eip_association" "nat" {
-  instance_id   = aws_instance.nat_instance.id
-  allocation_id = aws_eip.nat.id
-}
+##탄력 아이피 적용시 주석제거
+# resource "aws_eip" "nat" {
+#   domain = "vpc"
+# }
+# resource "aws_eip_association" "nat" {
+#   instance_id   = aws_instance.nat_instance.id
+#   allocation_id = aws_eip.nat.id
+# }
 
 ############################################
 # 06. ROUTE TABLES

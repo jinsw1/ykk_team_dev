@@ -21,6 +21,12 @@ services:
     networks:
       - app-network
 
+  ykk-app:
+    #image: ykk/lunch-app:latest
+    image: jinsw1/ykk-app-test:latest    
+    ports:
+      - "8000:8000"
+
   # fastapi:
   #   image: your-dockerhub-user/myapp:latest
   #   container_name: fastapi

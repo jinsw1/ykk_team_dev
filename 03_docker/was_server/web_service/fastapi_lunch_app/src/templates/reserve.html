@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>사내 점심 예약 시스템</title>
+  <!-- Bug 5 수정: cdnjs → jsdelivr로 CDN 교체 -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-family: "Pretendard", -apple-system, sans-serif; }
+
+    :root {
+      --orange:     #F97316;
+      --orange-lt:  #FFEDD5;
+      --orange-dk:  #EA580C;
+      --amber:      #F59E0B;
+      --bg:         #F8FAFC;
+      --card:       #FFFFFF;
+      --text:       #0F172A;
+      --muted:      #64748B;
+      --border:     #E2E8F0;
+      --red:        #EF4444;
+      --green:      #10B981;
+      --radius:     20px;
+    }
+
+    body { background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 60px; }
+
+    header { 
+      background: linear-gradient(135deg, #F97316 0%, #EA580C 100%); 
+      padding: 0 40px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      height: 92px; 
+      position: sticky; 
+      top: 0; 
+      z-index: 100; 
+      box-shadow: 0 4px 12px rgba(234, 88, 12, 0.15); 
+    }
+    
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .header-logo { width: 50px; height: 50px; background: rgba(255,255,255,.2); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; backdrop-filter: blur(8px); }
+    .header-title h1 { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+    .header-title p  { font-size: 13px; color: #fff; opacity: .85; margin-top: 2px; }
+    
+    .header-stats { display: flex; gap: 16px; align-items: center; }
+    .stat-chip { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.25); border-radius: 14px; padding: 10px 20px; display: flex; align-items: center; gap: 10px; color: #fff; }
+    .stat-chip .icon { font-size: 20px; }
+    .stat-chip .label { font-size: 11px; opacity: .8; margin-bottom: 2px; font-weight: 600; }
+    .stat-chip .value { font-size: 18px; font-weight: 800; line-height: 1; }
+
+    
+    .btn-header-logout { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 12px 18px; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+    .btn-header-logout:hover { background: rgba(255,255,255,0.3); border-color: rgba(255,255,255,0.5); }
+
+    .notice-bar { background-color: #FFF7ED; border-bottom: 1px solid #FFEDD5; padding: 14px 40px; display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; color: #C2410C; }
+
+    main { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+    .status-bar { margin-bottom: 32px; }
+    .status-bar h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: #1E293B; }
+
+    #my-res-panel { 
+      background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); 
+      border: 1.5px solid #A7F3D0; 
+      border-radius: var(--radius); 
+      padding: 24px 28px; 
+      margin-bottom: 36px; 
+      display: none; 
+      align-items: center; 
+      justify-content: space-between; 
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.06);
+    }
+    .my-res-info { display: flex; align-items: center; gap: 16px; }
+    .my-res-icon { font-size: 32px; }
+    .my-res-info h3 { font-size: 18px; font-weight: 800; color: #065F46; margin-bottom: 4px; }
+    .my-res-info p  { font-size: 14px; color: #047857; font-weight: 500; }
+
+    .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 28px; }
+    .menu-card { 
+      background: var(--card); 
+      border-radius: var(--radius); 
+      overflow: hidden; 
+      box-shadow: 0 4px 20px rgba(15, 23, 42, 0.02); 
+      border: 1px solid var(--border); 
+      position: relative; 
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .menu-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+      border-color: #CBD5E1;
+    }
+    .menu-card.soldout { opacity: .5; pointer-events: none; }
+    
+    .menu-img { width: 100%; aspect-ratio: 4/3; background: linear-gradient(135deg, var(--orange-lt), #FEF3C7); display: flex; align-items: center; justify-content: center; font-size: 68px; transition: transform 0.3s; }
+    .menu-card:hover .menu-img { transform: scale(1.03); }
+    
+    .badge { position: absolute; top: 16px; left: 16px; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .badge.popular  { background: #F97316; color: #fff; }
+    .badge.urgent   { background: #EF4444; color: #fff; }
+    
+    .menu-body { padding: 24px; }
+    .menu-name { font-size: 18px; font-weight: 800; color: #1E293B; margin-bottom: 6px; letter-spacing: -0.3px; }
+    .menu-desc { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; min-height: 42px; }
+    .menu-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .menu-remaining { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 500; color: var(--muted); }
+    .menu-remaining .count { font-weight: 800; color: var(--orange); }
+    .menu-remaining .count.low { color: var(--red); }
+    .menu-kcal { font-size: 13px; font-weight: 600; color: var(--muted); background: #F1F5F9; padding: 4px 8px; border-radius: 6px; }
+
+    .progress-bar { height: 6px; background: #E2E8F0; border-radius: 99px; margin-bottom: 20px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--orange), var(--amber)); transition: width .5s ease; }
+
+    .btn-reserve { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; background: linear-gradient(135deg, var(--orange), var(--orange-dk)); color: #fff; transition: all 0.2s; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2); }
+    .btn-reserve:hover { opacity: 0.95; box-shadow: 0 6px 16px rgba(249, 115, 22, 0.3); }
+    .btn-reserve:disabled { background: #E2E8F0; color: #94A3B8; cursor: not-allowed; box-shadow: none; }
+    .btn-qr { background: linear-gradient(135deg, var(--green), #059669); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); }
+    .btn-qr:hover { box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3); }
+
+    #toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(100px); opacity: 0; background: #1E293B; color: #fff; padding: 16px 28px; border-radius: 14px; font-size: 15px; font-weight: 600; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 999; white-space: nowrap; }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #toast.success { background: #065F46; }
+    #toast.error   { background: #991B1B; }
+
+    .info-footer { margin-top: 48px; background: #F8FAFC; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 28px; display: flex; align-items: flex-start; gap: 12px; }
+    .info-icon { font-size: 20px; }
+    .info-footer ul { display: flex; flex-wrap: wrap; gap: 8px 32px; list-style: none; font-size: 14px; color: var(--muted); font-weight: 500; }
+    .info-footer ul li::before { content: "• "; color: var(--orange); font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-logo">🍱</div>
+    <div class="header-title">
+      <h1>사내 점심 예약 시스템</h1>
+      <p>맛있는 점심, 행복한 하루! 😊</p>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="stat-chip">
+      <span class="icon">🕐</span>
+      <div><div class="label">신청 마감</div><div class="value">01:20 PM</div></div>
+    </div>
+    <div class="stat-chip">
+      <span class="icon">🛒</span>
+      <div><div class="label">남은 총 수량</div><div class="value" id="total-remaining">—</div></div>
+    </div>
+
+    <button class="btn-header-logout" onclick="logout()">로그아웃</button>
+  </div>
+</header>
+
+<div class="notice-bar">
+  <span>📢</span><span>10:00 ~ 11:00 신청 집중 시간으로 접속이 지연될 수 있습니다.</span>
+</div>
+
+<main>
+  <div class="status-bar" id="main-status-bar">
+    <h2>오늘의 메뉴</h2>
+  </div>
+
+  <div id="my-res-panel">
+    <div class="my-res-info">
+      <div class="my-res-icon">✅</div>
+      <div><h3>예약 완료되었습니다</h3><p id="my-res-desc">—</p></div>
+    </div>
+  </div>
+
+  <div class="menu-grid" id="menu-grid"></div>
+
+  <div class="info-footer">
+    <div class="info-icon">ℹ️</div>
+    <ul>
+      <li>1인 1식 신청 가능합니다.</li>
+      <li>신청 후 취소는 마감 시간 이전까지 가능합니다.</li>
+      <li>메뉴는 재고 상황에 따라 변경될 수 있습니다.</li>
+    </ul>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  const API = '/api'; 
+  let currentMenus = [];
+  let myReservationInfo = null;
+  let isFirstRender = true;
+
+  async function init() {
+    await fetchMyReservation(); 
+    await fetchMenus();
+    setInterval(fetchMenus, 30000); 
+  }
+
+  async function logout() {
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.href = '/';
+  }
+
+  async function fetchMyReservation() {
+    try {
+      const res = await fetch(`${API}/my-reservation`);
+      const data = await res.json();
+      if (data.success && data.reservation) {
+        myReservationInfo = data.reservation;
+        const panel = document.getElementById('my-res-panel');
+        document.getElementById('my-res-desc').textContent = `${data.reservation.name}님 · ${data.reservation.menu_name} · ${data.reservation.reserved_at}`;
+        panel.style.display = 'flex';
+
+
+      }
+    } catch {
+      console.log('예약 정보 로딩 실패');
+    }
+  }
+
+  async function fetchMenus() {
+    try {
+      const res  = await fetch(`${API}/menus`);
+      const data = await res.json();
+      currentMenus = data.menus;
+      document.getElementById('total-remaining').textContent = data.total_remaining + '개';
+      renderMenus(data.menus);
+    } catch {
+      console.log('메뉴 갱신 실패');
+    }
+  }
+
+  function renderMenus(menus) {
+    const grid = document.getElementById('menu-grid');
+    
+    if (isFirstRender) {
+      grid.innerHTML = menus.map(m => {
+        const pct = Math.round((m.remaining / m.total) * 100);
+        const isSoldout = m.remaining === 0;
+        const isLow = m.remaining <= 5;
+        const badgeHtml = m.badge ? `<div class="badge ${m.badge_type}">${m.badge_type === 'popular' ? '⭐' : '🔥'} ${m.badge}</div>` : '';
+
+        let btnHtml = '';
+        if (myReservationInfo) {
+          if (myReservationInfo.menu_id === m.id) {
+            btnHtml = `
+              <div style="display: flex; gap: 10px;">
+                <button class="btn-reserve btn-qr" style="flex: 1;" onclick="toggleQR(${m.id})">QR 보기</button>
+                <button class="btn-reserve" style="flex: 1; background: #EF4444; box-shadow: 0 4px 12px rgba(239,68,68,0.2);" onclick="cancelReservation()">예약 취소</button>
+              </div>
+            `;
+          } else {
+            btnHtml = `<button class="btn-reserve" disabled>신청 완료</button>`;
+          }
+        } else {
+          btnHtml = `<button class="btn-reserve" onclick="submitReservation(${m.id})" ${isSoldout ? 'disabled' : ''}>
+            ${isSoldout ? '품절' : '신청하기'}
+          </button>`;
+        }
+
+        let imgHtml = '';
+        if (m.image_url) {
+          imgHtml = `<div class="menu-img" style="background: url('${m.image_url}') center/cover no-repeat;"></div>`;
+        } else if (m.emoji) {
+          imgHtml = `<div class="menu-img">${m.emoji}</div>`;
+        } else {
+          imgHtml = `<div class="menu-img"></div>`;
+        }
+
+        return `
+          <div class="menu-card ${isSoldout ? 'soldout' : ''}" id="card-${m.id}">
+            ${imgHtml}
+            ${badgeHtml}
+            <div class="menu-body">
+              <div class="menu-name">${m.name}</div>
+              <div class="menu-desc">${m.description}</div>
+              <div class="menu-meta">
+                <div class="menu-remaining">🛒 남은 수량 <span class="count ${isLow ? 'low' : ''}" id="count-${m.id}">${m.remaining}개</span></div>
+                <div class="menu-kcal">${m.kcal} kcal</div>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" id="progress-${m.id}" style="width:${pct}%"></div>
+              </div>
+              
+              <div id="btn-container-${m.id}">${btnHtml}</div>
+
+              <!-- Bug 2 수정: 중복된 display 속성 제거 (display:flex 제거, display:none만 유지) -->
+              <div id="qrcode-${m.id}" style="margin-top: 20px; justify-content: center; background: #F8FAFC; border-radius: 12px; padding: 12px; display: none;"></div>
+            </div>
+          </div>`;
+      }).join('');
+      isFirstRender = false;
+    } else {
+      menus.forEach(m => {
+        const countSpan = document.getElementById(`count-${m.id}`);
+        const progFill = document.getElementById(`progress-${m.id}`);
+        
+        if (countSpan) {
+          countSpan.innerText = `${m.remaining}개`;
+          countSpan.className = `count ${m.remaining <= 5 ? 'low' : ''}`;
+        }
+        if (progFill) progFill.style.width = `${Math.round((m.remaining / m.total) * 100)}%`;
+      });
+    }
+  }
+
+  async function submitReservation(menuId) {
+    try {
+      const res = await fetch(`${API}/reserve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menu_id: menuId }) 
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        showToast(data.message, 'success');
+        myReservationInfo = data.reservation;
+        
+        const panel = document.getElementById('my-res-panel');
+        document.getElementById('my-res-desc').textContent = `${data.reservation.name}님 · ${data.reservation.menu_name} · ${data.reservation.reserved_at}`;
+        panel.style.display = 'flex';
+
+
+
+        isFirstRender = true;
+        await fetchMenus();
+        toggleQR(menuId);
+      } else {
+        showToast(data.detail || data.message || '예약 실패', 'error');
+      }
+    } catch {
+      showToast('서버 오류가 발생했습니다.', 'error');
+    }
+  }
+
+  async function cancelReservation() {
+    if (!confirm("정말 예약을 취소하시겠습니까?")) return;
+    try {
+      const res = await fetch(`${API}/cancel`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        myReservationInfo = null;
+        document.getElementById('my-res-panel').style.display = 'none';
+        document.querySelectorAll('[id^="qrcode-"]').forEach(el => { el.innerHTML = ""; el.style.display = 'none'; });
+        isFirstRender = true;
+        await fetchMenus();
+      } else {
+        showToast(data.detail || data.message || '예약 취소 실패', 'error');
+      }
+    } catch {
+      showToast('서버 오류가 발생했습니다.', 'error');
+    }
+  }
+
+  function toggleQR(menuId) {
+    const qrContainer = document.getElementById(`qrcode-${menuId}`);
+    if (qrContainer.style.display === 'flex') {
+      qrContainer.innerHTML = ""; 
+      qrContainer.style.display = 'none';
+    } else {
+      qrContainer.innerHTML = ""; 
+      qrContainer.style.display = 'flex';
+      const r = myReservationInfo;
+      const qrText = `EMP:${r.employee_id} | RES:${r.id}`;
+      new QRCode(qrContainer, { 
+        text: qrText, 
+        width: 130, 
+        height: 130,
+        correctLevel: QRCode.CorrectLevel.L 
+      });
+    }
+  }
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    setTimeout(() => t.className = '', 3000);
+  }
+
+  init();
+</script>
+</body>
+</html>

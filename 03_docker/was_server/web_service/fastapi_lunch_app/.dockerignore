@@ -1,0 +1,27 @@
+# Dockerfile 을 이용해서 이미지를 만들때 필요없는 파일이 COPY 블럭에서 CPOY 되지 않도록 예외를 설정할 수 있다.
+
+# 1. 도커 내부 설계도 및 메모장 (컨테이너 진입 금지)
+Dockerfile
+.dockerignore
+#*.md
+#memo.txt
+
+# 2. 로컬 개발 환경 찌꺼기 및 라이브러리 파편 (환경 충돌 방지)
+node_modules/
+.venv/
+venv/
+ENV/
+__pycache__/
+*.pyc
+
+# 3. 형상 관리 및 IDE 비밀 설정 (용량 다이어트)
+.git
+.gitignore
+.idea/
+.vscode/
+
+# 4. 비밀번호 및 키 파일 유출 차단
+.env
+*.pem
+*.key
+credentials.json

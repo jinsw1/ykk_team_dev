@@ -117,7 +117,7 @@ jobs:
 
                 "cd /home/ykk-admin/app/03_docker/was_server",
 
-                "echo \"DB_HOST=$DB_HOST\" > .env"
+                "echo \"DB_HOST=$DB_HOST\" > .env",
 
                 "docker pull jinsw1/ykk-app-test:1.0",
                 "docker compose down || true",

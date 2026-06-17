@@ -96,33 +96,31 @@ jobs:
             --query "Parameter.Value" \
             --output text)
 
-          echo "DB_HOST=$DB_HOST"        
-        
+          echo "DB_HOST=$DB_HOST"
+
           aws ssm send-command \
             --region ap-northeast-2 \
             --document-name "AWS-RunShellScript" \
             --instance-ids $INSTANCE_IDS \
             --comment "Docker Deploy" \
-            --parameters '{
-              "commands":[
-                "sudo -iu ykk-admin bash << EOF",
-                "set -e",
+            --parameters "commands=[
+              \"sudo -iu ykk-admin bash << 'EOF'\",
+              \"set -e\",
 
-                "echo \"Logging into Docker Hub\"",
-                "echo \"${{ secrets.DOCKER_PASSWORD }}\" | docker login -u \"${{ secrets.DOCKER_USERNAME }}\" --password-stdin",
+              \"echo Logging into Docker Hub\",
+              \"echo '${{ secrets.DOCKER_PASSWORD }}' | docker login -u '${{ secrets.DOCKER_USERNAME }}' --password-stdin\",
 
-                "cd /home/ykk-admin/app",
-                "git fetch origin main",
-                "git checkout origin/main -- 03_docker/was_server",
+              \"cd /home/ykk-admin/app\",
+              \"git fetch origin main\",
+              \"git checkout origin/main -- 03_docker/was_server\",
 
-                "cd /home/ykk-admin/app/03_docker/was_server",
+              \"cd /home/ykk-admin/app/03_docker/was_server\",
 
-                "echo \"DB_HOST=$DB_HOST\" > .env",
+              \"echo DB_HOST=$DB_HOST > .env\",
 
-                "docker pull jinsw1/ykk-app-test:1.0",
-                "docker compose down || true",
-                "docker compose up -d --build",
+              \"docker pull jinsw1/ykk-app-test:1.0\",
+              \"docker compose down || true\",
+              \"docker compose up -d --build\",
 
-                "EOF"
-              ]
-            }'
+              \"EOF\"
+            ]"

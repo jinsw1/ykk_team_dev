@@ -23,7 +23,7 @@ services:
 
   ykk-app:
     #image: ykk/lunch-app:latest
-    image: jinsw1/ykk-app-test:latest    
+    image: jinsw1/ykk-app-test:1.0
     ports:
       - "8000:8000"
 

@@ -10,7 +10,7 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "message": "Hello FastAPI + Jinja2"}
-    )
+	return templates.TemplateResponse(
+	    name="index.html",
+	    context={"request": request, "message": "Hello FastAPI + Jinja2"}
+	)

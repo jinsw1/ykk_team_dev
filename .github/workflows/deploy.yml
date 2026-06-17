@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -76,7 +76,8 @@ jobs:
                 "git fetch origin main",
                 "git checkout origin/main -- 03_docker/was_server",
 
-                "cd /home/ykk-admin/app/03_docker/was_server",
+                "cd /home/ykk-admin/app/03_docker/was_server",                
+                "docker pull jinsw1/ykk-app-test:1.0",
                 "docker compose down || true",
                 "docker compose up -d --build",
 

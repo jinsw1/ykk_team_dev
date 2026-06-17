@@ -8,7 +8,6 @@
   become: yes
   roles:
     - role: common
-      tags: [common, security]
 
 # # =================================================================
 # # [2단계] 모든 서버 컨테이너 구동 환경 (Docker) 구축
@@ -25,19 +24,13 @@
   become: yes
   roles:
     - role: docker
-      tags: [common, security]
 
-
-
-- name: ""
-  hosts: ykk_was  
+- name: "was 서버 초기세팅(docker-compose (nginx/fastapi 실행))"
+  hosts: ykk_was
   roles:
     - role: was_set
-      tags: [common, security]
 
-
-- name: ""
+- name: "DB 서버 초기세팅(docker-compose (postgresql 실행))"
   hosts: ykk_db
   roles:
     - role: db_set
-      tags: [common, security]

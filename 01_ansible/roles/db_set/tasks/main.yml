@@ -1,35 +1,83 @@
 ---
-# 기존 삭제
-- name: Clean db directory
-  file:
-    path: /home/ykk-admin/db
-    state: absent
-
-- name: Create db directory
+- name: Ensure db directory exists
   file:
     path: /home/ykk-admin/db
     state: directory
+    owner: ykk-admin
+    group: ykk-admin
 
-# sparse clone
-- name: Clone repo without checkout
-  ansible.builtin.shell: |
+- name: Check git repo exists
+  stat:
+    path: /home/ykk-admin/db/.git
+  register: git_repo
+
+- name: Clone repo (first time only)
+  become_user: ykk-admin
+  shell: |
     git clone --no-checkout https://github.com/jinsw1/ykk_team_dev.git /home/ykk-admin/db
+  args:
+    creates: /home/ykk-admin/db/.git
 
-# sparse 설정
 - name: Enable sparse checkout
-  ansible.builtin.shell: |
+  become_user: ykk-admin
+  shell: |
     cd /home/ykk-admin/db
     git sparse-checkout init --cone
     git sparse-checkout set 03_docker/db_server
 
-# checkout
-- name: Checkout branch
-  ansible.builtin.shell: |
+
+- name: Fetch latest changes
+  become_user: ykk-admin
+  shell: |
+    cd /home/ykk-admin/db
+    git fetch origin main
+
+- name: Reset to latest commit
+  become_user: ykk-admin
+  shell: |
     cd /home/ykk-admin/db
     git checkout main
+    git reset --hard origin/main
 
-# deploy
 - name: Run docker compose
-  ansible.builtin.shell: |
+  become_user: ykk-admin
+  shell: |
     cd /home/ykk-admin/db/03_docker/db_server
-    docker compose up -d    
+    docker compose up -d --build
+
+
+
+# # 기존 삭제
+# - name: Clean db directory
+#   file:
+#     path: /home/ykk-admin/db
+#     state: absent
+
+# - name: Create db directory
+#   file:
+#     path: /home/ykk-admin/db
+#     state: directory
+
+# # sparse clone
+# - name: Clone repo without checkout
+#   ansible.builtin.shell: |
+#     git clone --no-checkout https://github.com/jinsw1/ykk_team_dev.git /home/ykk-admin/db
+
+# # sparse 설정
+# - name: Enable sparse checkout
+#   ansible.builtin.shell: |
+#     cd /home/ykk-admin/db
+#     git sparse-checkout init --cone
+#     git sparse-checkout set 03_docker/db_server
+
+# # checkout
+# - name: Checkout branch
+#   ansible.builtin.shell: |
+#     cd /home/ykk-admin/db
+#     git checkout main
+
+# # deploy
+# - name: Run docker compose
+#   ansible.builtin.shell: |
+#     cd /home/ykk-admin/db/03_docker/db_server
+#     docker compose up -d    

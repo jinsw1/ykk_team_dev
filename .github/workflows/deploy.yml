@@ -56,7 +56,7 @@ jobs:
               "Name=tag:Role,Values=was" \
               "Name=instance-state-name,Values=running" \
             --query "Reservations[].Instances[].InstanceId" \
-            --output text)
+            --output text | tr '\t' ' ')
 
           if [ -z "$INSTANCE_IDS" ]; then
             echo "No running WAS instances found"

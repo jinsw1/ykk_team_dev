@@ -452,6 +452,19 @@ module "project02_db_ec2" {
   env    = "prod"
 }
 
+
+############################################
+# SSM PARAMETER STORE
+############################################
+resource "aws_ssm_parameter" "db_host" {
+  name  = "/app/db/host"
+  type  = "String"
+  value = module.project02_db_ec2.private_ip
+  overwrite = true
+  
+  depends_on = [module.project02_db_ec2]  
+}
+
 ############################################
 # 11. TAILSCALE ROUTE 승인
 ############################################
@@ -669,7 +682,6 @@ resource "local_file" "ansible_config"{
         host_key_checking = False
     EOF
 }
-
 
 ############################################
 # 16. OUTPUTS

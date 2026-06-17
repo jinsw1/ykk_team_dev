@@ -1,4 +1,19 @@
 ---
+
+- name: Get DB IP from Terraform
+  command: terraform output -raw instance_db_private_ip
+  register: db_ip
+
+- name: Create .env file
+  copy:
+    dest: /home/ykk-admin/app/03_docker/was_server/.env
+    content: |
+      DB_HOST={{ db_ip.stdout }}
+      DB_USER=scott
+      DB_PASSWORD=tiger
+      DB_NAME=lunch_db
+      DB_PORT=5432
+
 - name: Ensure app directory exists
   file:
     path: /home/ykk-admin/app

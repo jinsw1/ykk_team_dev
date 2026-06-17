@@ -1,16 +1,11 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI
 
 app = FastAPI()
 
-# templates 폴더 지정
-templates = Jinja2Templates(directory="templates")
+@app.get("/")
+def read_root():
+	return {"message": "hello, fastapi!"}
 
-
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-	return templates.TemplateResponse(
-	    "index.html",
-	    {"request": request}
-	)
+@app.get("/fortune")
+def read_fortune():
+	return {"message": "동쪽으로 가면 귀인을 만나요"}

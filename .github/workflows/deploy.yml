@@ -98,6 +98,8 @@ jobs:
             --name "/app/db/host" \
             --query "Parameter.Value" \
             --output text)
+            
+          echo "DB_HOST=$DB_HOST"
 
           aws ssm send-command \
             --region ap-northeast-2 \
@@ -118,7 +120,7 @@ jobs:
 
                 "cd /home/ykk-admin/app/03_docker/was_server",
 
-                "echo DB_HOST=$DB_HOST > .env\",
+                "echo DB_HOST=$DB_HOST > .env",
 
                 "docker pull jinsw1/ykk-app-test:1.0",
                 "docker compose down || true",

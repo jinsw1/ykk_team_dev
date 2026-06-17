@@ -81,16 +81,24 @@ jobs:
             --query 'InstanceInformationList[*].[InstanceId,PingStatus]' \
             --output table
 
-      - name: Check SSM managed instances!!!!
+      - name: Check SSM parameter!!!!
         run: |
           aws ssm get-parameter \
             --name "/app/db/host" \
             --query "Parameter.Value" \
-            --output text       
+            --output text
+
+            
 
 
       - name: Deploy via SSM
         run: |
+
+          DB_HOST=$(aws ssm get-parameter \
+            --name "/app/db/host" \
+            --query "Parameter.Value" \
+            --output text)
+
           aws ssm send-command \
             --region ap-northeast-2 \
             --document-name "AWS-RunShellScript" \
@@ -110,10 +118,7 @@ jobs:
 
                 "cd /home/ykk-admin/app/03_docker/was_server",
 
-                "DB_HOST=$(aws ssm get-parameter --name \"/app/db/host\" --query \"Parameter.Value\" --output text)",
-
-                "echo \"DB_HOST=$DB_HOST\"",
-                "printf \"DB_HOST=%s\n\" \"$DB_HOST\" > .env",
+                \"printf 'DB_HOST=%s\\n' '$DB_HOST' > .env\",
 
                 "docker pull jinsw1/ykk-app-test:1.0",
                 "docker compose down || true",

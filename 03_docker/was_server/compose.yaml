@@ -26,6 +26,8 @@ services:
     image: jinsw1/ykk-app-test:1.0
     ports:
       - "8000:8000"
+    networks:
+      - app-network      
 
   # fastapi:
   #   image: your-dockerhub-user/myapp:latest

@@ -284,7 +284,8 @@ module "project02_db_sg" {
       protocol    = "tcp"
       # 만약 서브넷 모듈에 cidr_block output 이 없다면
       # 하드코딩으로 directly 입력해 주세요.
-      cidr_blocks = ["10.0.10.0/24"]
+      #cidr_blocks = ["10.0.10.0/24"]
+	  security_groups = [module.project02_was_sg.sg_id]
       # ← 여기서 한글 화살표(→) 대신 ASCII -> 로 변경
       description = "WAS to DB"
     },

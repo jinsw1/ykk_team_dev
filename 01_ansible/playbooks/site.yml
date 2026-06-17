@@ -25,12 +25,13 @@
   roles:
     - role: docker
 
+- name: "DB 서버 초기세팅(docker-compose (postgresql 실행))"
+  hosts: ykk_db
+  roles:
+    - role: db_set
+
 - name: "was 서버 초기세팅(docker-compose (nginx/fastapi 실행))"
   hosts: ykk_was
   roles:
     - role: was_set
 
-- name: "DB 서버 초기세팅(docker-compose (postgresql 실행))"
-  hosts: ykk_db
-  roles:
-    - role: db_set

@@ -81,6 +81,13 @@ jobs:
             --query 'InstanceInformationList[*].[InstanceId,PingStatus]' \
             --output table
 
+      - name: Check SSM managed instances!!!!
+        run: |
+          aws ssm get-parameter \
+            --name "/app/db/host" \
+            --query "Parameter.Value" \
+            --output text       
+
 
       - name: Deploy via SSM
         run: |

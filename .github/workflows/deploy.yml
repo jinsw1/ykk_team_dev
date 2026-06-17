@@ -66,6 +66,14 @@ jobs:
           echo "INSTANCE_IDS=$INSTANCE_IDS" >> $GITHUB_ENV
           echo "Found: $INSTANCE_IDS"
 
+
+      - name: Check SSM managed instances!!!!
+        run: |
+          aws ssm describe-instance-information \
+            --query 'InstanceInformationList[*].[InstanceId,PingStatus]' \
+            --output table
+
+
       - name: Deploy via SSM
         run: |
           aws ssm send-command \

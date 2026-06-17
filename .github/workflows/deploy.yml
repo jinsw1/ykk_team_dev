@@ -30,6 +30,14 @@ jobs:
           aws-region: ap-northeast-2
 
 
+      - name: Debug instance IDs
+        run: |
+          echo "INSTANCE_IDS=[${INSTANCE_IDS}]"
+          aws ec2 describe-instances \
+            --region ap-northeast-2 \
+            --instance-ids i-0d50658d420b12328
+
+
         
       # 1. Docker Hub 로그인 (CI 단계)
       - name: Login to Docker Hub

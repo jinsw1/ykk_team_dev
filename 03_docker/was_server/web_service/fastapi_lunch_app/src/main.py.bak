@@ -8,4 +8,4 @@ def read_root():
 
 @app.get("/fortune")
 def read_fortune():
-	return {"message": "동쪽으로 가면 귀인을 만나요!!!!@@"}
+	return {"message": "동쪽으로 가면 귀인을 만나요!!!!@@##"}

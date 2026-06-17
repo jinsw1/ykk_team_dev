@@ -18,6 +18,22 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
+
+      # 1. Docker Hub 로그인 (CI 단계)
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # 2. Docker build
+      - name: Build Docker image
+        run: |
+          docker build -t jinsw1/ykk-app-test:1.0 ./03_docker/was_server
+
+      # 3. Docker push
+      - name: Push Docker image
+        run: |
+          docker push jinsw1/ykk-app-test:1.0
+
       - name: Find WAS instances
         id: instances
         run: |

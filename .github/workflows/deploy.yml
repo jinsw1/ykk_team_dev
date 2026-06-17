@@ -105,16 +105,14 @@ jobs:
                 "echo \"${{ secrets.DOCKER_PASSWORD }}\" | docker login -u \"${{ secrets.DOCKER_USERNAME }}\" --password-stdin",
 
                 "DB_HOST=$(aws ssm get-parameter --name \"/app/db/host\" --query \"Parameter.Value\" --output text)",
-                "echo \"DB_HOST=$DB_HOST\"",
+                "echo \"DB_HOST=$DB_HOST\" > /home/ykk-admin/app/03_docker/was_server/.env",
 
                 "cd /home/ykk-admin/app",
                 "git fetch origin main",
                 "git checkout origin/main -- 03_docker/was_server",
 
                 "cd /home/ykk-admin/app/03_docker/was_server",
-
-                "export DB_HOST=$DB_HOST",
-
+                
                 "docker pull jinsw1/ykk-app-test:1.0",
                 "docker compose down || true",
                 "docker compose up -d --build",

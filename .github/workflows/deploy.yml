@@ -6,11 +6,12 @@ on:
       - main
 
     paths:
-      - "Dockerfile"
-      - "docker-compose.ymal"
-      - "compose.ymal"
-      - "src/**"
-      - "was-server/**"      
+      # - "Dockerfile"
+      # - "docker-compose.ymal"
+      # - "compose.ymal"
+      # - "src/**"
+      # - "was-server/**"      
+      - "03_docker/was_server/**"      
 
   workflow_dispatch:
 

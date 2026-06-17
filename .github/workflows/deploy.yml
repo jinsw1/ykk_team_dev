@@ -30,7 +30,7 @@ jobs:
       # 2. Docker build
       - name: Build Docker image
         run: |
-          docker build -t jinsw1/ykk-app-test:1.0 ./03_docker/was_server
+          docker build -t jinsw1/ykk-app-test:1.0 ./03_docker/was_server/web_service/fastapi_lunch_app
 
       # 3. Docker push
       - name: Push Docker image

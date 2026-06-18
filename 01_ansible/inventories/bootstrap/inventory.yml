@@ -2,19 +2,19 @@
   "children":
     "ykk_db":
       "hosts":
-        "10.0.30.219":
+        "10.0.30.128":
           "ansible_ssh_private_key_file": "~/.ssh/project02-db-key.pem"
           "ansible_user": "ubuntu"
     "ykk_infra":
       "hosts":
-        "10.0.10.24":
+        "10.0.10.204":
           "ansible_ssh_private_key_file": "~/.ssh/project02-infra-key.pem"
           "ansible_user": "ubuntu"
     "ykk_was":
       "hosts":
-        "10.0.20.127":
+        "10.0.20.141":
           "ansible_ssh_private_key_file": "~/.ssh/project02-was-key.pem"
           "ansible_user": "ubuntu"
-        "10.0.21.13":
+        "10.0.21.47":
           "ansible_ssh_private_key_file": "~/.ssh/project02-was-key.pem"
           "ansible_user": "ubuntu"

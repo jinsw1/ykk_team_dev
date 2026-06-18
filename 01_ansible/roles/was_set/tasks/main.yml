@@ -1,18 +1,16 @@
 ---
 
-- name: Get DB IP from Terraform
-  command: terraform output -raw instance_db_private_ip
-  register: db_ip
+# - name: Get DB IP from Terraform
+#   delegate_to: localhost
+#   command: terraform output -raw instance_db_private_ip
+#   args:
+#     chdir: ../../02_terraform/envs/01_dev  
+#   register: db_ip
 
-- name: Create .env file
-  copy:
-    dest: /home/ykk-admin/app/03_docker/was_server/.env
-    content: |
-      DB_HOST={{ db_ip.stdout }}
-      DB_USER=scott
-      DB_PASSWORD=tiger
-      DB_NAME=lunch_db
-      DB_PORT=5432
+- name: Get DB IP from SSM
+  delegate_to: localhost
+  shell: aws ssm get-parameter --name "/app/db/host" --query "Parameter.Value" --output text
+  register: db_ip
 
 - name: Ensure app directory exists
   file:
@@ -40,6 +38,11 @@
     git sparse-checkout init --cone
     git sparse-checkout set 03_docker/was_server
 
+# - name: Checkout was_server as standalone worktree
+#   become_user: ykk-admin
+#   shell: |
+#     git -C /home/ykk-admin/app worktree add /home/ykk-admin/was_server 03_docker/was_server
+
 - name: Fetch latest changes
   become_user: ykk-admin
   shell: |
@@ -52,6 +55,18 @@
     cd /home/ykk-admin/app
     git checkout main
     git reset --hard origin/main
+
+
+- name: Create .env file
+  copy:
+    dest: /home/ykk-admin/app/03_docker/was_server/.env
+    content: |
+      DB_HOST={{ db_ip.stdout }}
+      # DB_USER=scott
+      # DB_PASSWORD=tiger
+      # DB_NAME=lunch_db
+      # DB_PORT=5432
+
 
 - name: Run docker compose
   become_user: ykk-admin

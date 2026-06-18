@@ -1,0 +1,10 @@
+#default.conf.bak.latest
+# ip 직접 접근 차단
+server {
+    listen 80 default_server;
+    server_name _;
+    #return 444;
+
+    default_type text/plain;
+    return 200 "222222222222222";
+}

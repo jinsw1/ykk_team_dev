@@ -61,6 +61,7 @@
   copy:
     dest: /home/ykk-admin/app/03_docker/was_server/.env
     content: |
+      ENV={{ env }}
       DB_HOST={{ db_ip.stdout }}
       # DB_USER=scott
       # DB_PASSWORD=tiger
